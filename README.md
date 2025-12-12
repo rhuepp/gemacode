@@ -1,4 +1,4 @@
-# 00_READ_ME
+# README
 
 ## Table of Contents
 - [01_Analysis.py](#01_analysispy)
