@@ -497,7 +497,7 @@ def plot_across_permutation_importance(pi_df, title, ax=None):
     p = so.Plot(data=pi_df, y='feature', x='permutation_importance', xmin='ymin', xmax='ymax')
     p = p.add(so.Dot())
     p = p.add(so.Range())
-    p = p.label(title=title, y="Feature", x="Permutation Importance (R² decrease)")
+    p = p.label(title=title, y="Feature", x="Permutation Importance ($R^2$ decrease)")
     
     # Set font to Arial for all text elements
     p = p.theme({
@@ -508,14 +508,104 @@ def plot_across_permutation_importance(pi_df, title, ax=None):
     
     p.on(ax).plot()
 
-# Create a figure with two subplots arranged vertically (Supplementary Figure G)
+# Create a figure with two subplots arranged vertically
 fig, axes = plt.subplots(2, 1, figsize=(8, 12), constrained_layout=True, sharex=True)
 
+
+feature_dict = {
+    'session_n': "Number of previous visits",
+    'diag': "Diagnosis",
+    'demo_sex': "Sex",
+    'demo_age': "Age",
+    'demo_education': "Education",
+    'diabetes_DIABETES': "Diabetes",
+    'hypercho_HYPERCHO': "Hypercholesterolemia",
+    'cvasc_HYPERTEN': "Hypertension",
+    'cvasc_CBSTROKE': "Stroke",
+    'cvasc_CBTIA': "Transient Ischemic Attack",
+    'cvasc_CVHATT': "Heart Attack",
+    'cvasc_CVAFIB': "Atrial Fibrillation",
+    'cvasc_CVANGIO': "Angiography",
+    'cvasc_CVOTHR': "Other Cardiovascular",
+    'cdr_commun': "CDR (Communication)",
+    'cdr_homehobb': "CDR (Home and Hobbies)",
+    'cdr_judgment': "CDR (Judgment)",
+    'cdr_memory': "CDR (Memory)",
+    'cdr_orient': "CDR (Orientation)",
+    'cdr_perscare': "CDR (Personal Care)",
+    'cdr_sob': "CDR-SOB",
+    'cdr_cdrGlobal': "CDR (Global)",
+    'mmse_mmse': "MMSE (Total)",
+    'gds_gdsSum': "GDS (Sum)",
+    'faq_BILLS': "FAQ (Bills)",
+    'faq_TAXES': "FAQ (Taxes)",
+    'faq_SHOPPING': "FAQ (Shopping)",
+    'faq_GAMES': "FAQ (Games)",
+    'faq_STOVE': "FAQ (Stove)",
+    'faq_MEALPREP': "FAQ (Meal Preparation)",
+    'faq_EVENTS': "FAQ (Events)",
+    'faq_PAYATTN': "FAQ (Pay Attention)",
+    'faq_REMDATES': "FAQ (Remember Dates)",
+    'faq_TRAVEL': "FAQ (Travel)",
+    'faq_faqSum': "FAQ (Total)",
+    'npiq_npiqPresSum': "NPI-Q (Presence Sum)",
+    'npiq_npiqSevSum': "NPI-Q (Severity Sum)",
+    'apoe_e2count': "APOE ε2 Count",
+    'apoe_e3count': "APOE ε3 Count",
+    'apoe_e4count': "APOE ε4 Count",
+    'WMSlm_LOGIMEM': "WMS (Logical Memory)",
+    'WMSlm_MEMUNITS': "WMS (Memory Units)",
+    'WMSlm_MEMTIME': "WMS (Memory Time)",
+    'WF_ANIMALS': "Word Fluency (Animals)",
+    'TMTA_TRAILA': "Trail Making Test A",
+    'TMTB_TRAILB': "Trail Making Test B",
+    'TMTB_TRAILBnorm': "Trail Making Test B (normalized)",
+    'BOSTON_BOSTON': "Boston Naming Test (Total)",
+    'fs__globalVolume__3rd-Ventricle': "Volume of 3rd Ventricle",
+    'fs__globalVolume__4th-Ventricle': "Volume of 4th Ventricle",
+    'fs__globalVolume__CC_Anterior': "Volume of Corpus Callosum (Anterior)",
+    'fs__globalVolume__CC_Central': "Volume of Corpus Callosum (Central)",
+    'fs__globalVolume__CC_Mid_Anterior': "Volume of Corpus Callosum (Mid Anterior)",
+    'fs__globalVolume__CC_Mid_Posterior': "Volume of Corpus Callosum (Mid Posterior)",
+    'fs__globalVolume__CC_Posterior': "Volume of Corpus Callosum (Posterior)",
+    'fs__globalVolume__Left-Cerebellum-Cortex': "Volume of Cerebellum Cortex (Left)",
+    'fs__globalVolume__Left-Cerebellum-White-Matter': "Volume of Cerebellum White Matter (Left)",
+    'fs__globalVolume__Left-Lateral-Ventricle': "Volume of Lateral Ventricle (Left)",
+    'fs__globalVolume__Right-Cerebellum-Cortex': "Volume of Cerebellum Cortex (Right)",
+    'fs__globalVolume__Right-Cerebellum-White-Matter': "Volume of Cerebellum White Matter (Right)",
+    'fs__globalVolume__Right-Lateral-Ventricle': "Volume of Lateral Ventricle (Right)",
+    'fs__globalVolume__SubCortGrayVol': "Volume of Subcortical Gray Matter",
+    'fs__globalVolume__TotalGrayVol': "Volume of Total Gray Matter",
+    'fs__globalVolume__lhCerebralWhiteMatterVol': "Volume of Cerebral White Matter (Left)",
+    'fs__globalVolume__lhCortexVol': "Volume of Cortex (Left)",
+    'fs__globalVolume__lh_MeanThickness_thickness': "Mean Cortical Thickness (Left)",
+    'fs__globalVolume__rhCerebralWhiteMatterVol': "Volume of Cerebral White Matter (Right)",
+    'fs__globalVolume__rhCortexVol': "Volume of Cortex (Right)",
+    'fs__globalVolume__rh_MeanThickness_thickness': "Mean Cortical Thickness (Right)",
+    'fs__subcortVolume__Left-Accumbens-area': "Volume of Accumbens (Left)",
+    'fs__subcortVolume__Left-Amygdala': "Volume of Amygdala (Left)",
+    'fs__subcortVolume__Left-Caudate': "Volume of Caudate (Left)",
+    'fs__subcortVolume__Left-Hippocampus': "Volume of Hippocampus (Left)",
+    'fs__subcortVolume__Left-Pallidum': "Volume of Pallidum (Left)",
+    'fs__subcortVolume__Left-Putamen': "Volume of Putamen (Left)",
+    'fs__subcortVolume__Left-Thalamus-Proper': "Volume of Thalamus (Left)",
+    'fs__subcortVolume__Right-Accumbens-area': "Volume of Accumbens (Right)",
+    'fs__subcortVolume__Right-Amygdala': "Volume of Amygdala (Right)",
+    'fs__subcortVolume__Right-Caudate': "Volume of Caudate (Right)",
+    'fs__subcortVolume__Right-Hippocampus': "Volume of Hippocampus (Right)",
+    'fs__subcortVolume__Right-Pallidum': "Volume of Pallidum (Right)",
+    'fs__subcortVolume__Right-Putamen': "Volume of Putamen (Right)",
+    'fs__subcortVolume__Right-Thalamus-Proper': "Volume of Thalamus (Right)",
+}
+
+oasis2adni_pi['feature_names'] = oasis2adni_pi['feature'].map(feature_dict)
+adni2oasis_pi['feature_names'] = adni2oasis_pi['feature'].map(feature_dict)
+
 # Plot for OASIS to ADNI
-plot_across_permutation_importance(oasis2adni_pi, "A) OASIS-3 → ADNI: Feature Importance", ax=axes[0])
+plot_across_permutation_importance(oasis2adni_pi.rename(columns={"feature_names": "feature", "feature": "feature_i"}), "A) OASIS-3 → ADNI: Feature Importance", ax=axes[0])
 
 # Plot for ADNI to OASIS
-plot_across_permutation_importance(adni2oasis_pi, "B) ADNI → OASIS-3: Feature Importance", ax=axes[1])
+plot_across_permutation_importance(adni2oasis_pi.rename(columns={"feature_names": "feature", "feature": "feature_i"}), "B) ADNI → OASIS-3: Feature Importance", ax=axes[1])
 
 
 plt.savefig("cross_dataset_feature_importance.png", dpi=300, bbox_inches="tight")
