@@ -1057,10 +1057,23 @@ def apa_format(column):
         formatted = column.apply(lambda x: round(x, 2) if isinstance(x, float) else str(x))
     return formatted
 
+
+# correct for multiple comparisons using Holm-Bonferroni method
+from statsmodels.stats.multitest import multipletests
+
+res_subset_adni["sob_pvalue_corrected"] = multipletests(res_subset_adni["sob_pvalue"], method='holm')[1]
+res_subset_adni["mmse_pvalue_corrected"] = multipletests(res_subset_adni["mmse_pvalue"], method='holm')[1]
+
+res_subset_oasis["sob_pvalue_corrected"] = multipletests(res_subset_oasis["sob_pvalue"], method='holm')[1]
+res_subset_oasis["mmse_pvalue_corrected"] = multipletests(res_subset_oasis["mmse_pvalue"], method='holm')[1]
+
 # Format the results in APA style
 res_subset_adni.apply(apa_format).to_csv("ADNI_subgroup_analysis.csv")
 res_subset_oasis.apply(apa_format).to_csv("OASIS_subgroup_analysis.csv")
 
+
+res_subset_adni.apply(apa_format)[["sob_pvalue_corrected", "mmse_pvalue_corrected"]]
+res_subset_oasis.apply(apa_format)[["sob_pvalue_corrected", "mmse_pvalue_corrected"]]
 # %%
 # ## 6. Post-Hoc Matched Samples Analysis
 # ### 6.1 Quantile-Based Sample Matching
