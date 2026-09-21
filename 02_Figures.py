@@ -242,7 +242,7 @@ for i, ax in enumerate(axs.ravel()):
 plt.tight_layout()
 
 # save 
-plt.savefig('r2_perf.png', dpi=300)
+plt.savefig('r2_perf.pdf', dpi=300)
 
 # %%
 # ## Figure 2: Distribution of Absolute Error According to Subgroups.
@@ -507,7 +507,7 @@ for i, ax in enumerate(axs.ravel()):
     ax.text(-0.175, 1.05, chr(65+i), transform=ax.transAxes, fontsize=16, font_properties = font, fontweight='bold')
 
 # save figure
-plt.savefig('subgroup_violinplot.png', dpi=300, bbox_inches='tight')
+plt.savefig('subgroup_violinplot.pdf', dpi=300, bbox_inches='tight')
 
 # %%
 # # Supplementary Figures
@@ -752,12 +752,13 @@ df_oasis2adni_extended["diag"] = df_oasis2adni_extended["diag"].map({"NL": 0, "M
 
 # 2x2 grid of scatter plots
 fig, axs = plt.subplots(2, 2, figsize=(5, 9), sharex="col", sharey="col", gridspec_kw={'hspace': 0.3, 'wspace': 1})
-plot_scatter(df_oasis2adni_extended['sob_pred'], df_oasis2adni_extended['sob_slope'], 'Predicted CDR-SOB', 'True CDR-SOB', 'OASIS-3 → ADNI', ax=axs[0, 0], font=font, color=df_oasis2adni_extended["diag"], labels=["HC", "MCI", "AD"])
-plot_scatter(df_oasis2adni_extended['mmse_pred'], df_oasis2adni_extended['mmse_slope'], 'Predicted MMSE', 'True MMSE', 'OASIS-3 → ADNI', ax=axs[0, 1], font=font, color=df_oasis2adni_extended["diag"], labels=["HC", "MCI", "AD"])
-plot_scatter(df_adni2oasis_extended['sob_pred'], df_adni2oasis_extended['sob_slope'], 'Predicted CDR-SOB', 'True CDR-SOB', 'ADNI → OASIS-3', ax=axs[1, 0], font=font, color=df_adni2oasis_extended["diag"], labels=["HC", "MCI", "AD"])
-plot_scatter(df_adni2oasis_extended['mmse_pred'], df_adni2oasis_extended['mmse_slope'], 'Predicted MMSE', 'True MMSE', 'ADNI → OASIS-3', ax=axs[1, 1], font=font, color=df_adni2oasis_extended["diag"], labels=["HC", "MCI", "AD"])
+plot_scatter(df_oasis2adni_extended['sob_pred'], df_oasis2adni_extended['sob_slope'], '', 'True slope', 'OASIS-3 → ADNI\n(CDR-SOB)', ax=axs[0, 0], font=font, color=df_oasis2adni_extended["diag"], labels=["HC", "MCI", "AD"])
+plot_scatter(df_oasis2adni_extended['mmse_pred'], df_oasis2adni_extended['mmse_slope'], '', '', 'OASIS-3 → ADNI\n(MMSE)', ax=axs[0, 1], font=font, color=df_oasis2adni_extended["diag"], labels=["HC", "MCI", "AD"])
+plot_scatter(df_adni2oasis_extended['sob_pred'], df_adni2oasis_extended['sob_slope'], 'Predicted slope', 'True slope', 'ADNI → OASIS-3\n(CDR-SOB)', ax=axs[1, 0], font=font, color=df_adni2oasis_extended["diag"], labels=["HC", "MCI", "AD"])
+plot_scatter(df_adni2oasis_extended['mmse_pred'], df_adni2oasis_extended['mmse_slope'], 'Predicted slope', '', 'ADNI → OASIS-3\n(MMSE)', ax=axs[1, 1], font=font, color=df_adni2oasis_extended["diag"], labels=["HC", "MCI", "AD"])
 plt.tight_layout()
-axs[1,1].legend(fontsize=14, prop={'family': 'Arial'}, loc='center left', bbox_to_anchor=(1, 0.5), title="Diagnosis", title_fontsize="14")
+legend = axs[1,1].legend(fontsize=14, prop={'family': 'Arial'}, loc='center left', bbox_to_anchor=(1, 0.5), title="Diagnosis", title_fontsize="14")
+legend.get_title().set_fontfamily('Arial')
 
 # add A, B, C, D labels
 for i, ax in enumerate(axs.ravel()):
