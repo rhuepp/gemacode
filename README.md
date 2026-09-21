@@ -46,7 +46,8 @@
 
 ### 3. Across-Dataset Predictions
 - 3.1 Cross-Dataset Prediction (Clinical, Structural, Combined, Top-15)  
-- 3.2 Cross-Dataset Results Aggregation  
+- 3.2 Cross-Dataset Results Aggregation
+- 3.3 Cross-Dataset Training Size Sensitivity Analysis  
 
 ---
 

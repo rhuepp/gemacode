@@ -54,6 +54,7 @@ import sklearn
 from sklearn import metrics
 from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.multioutput import MultiOutputRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.metrics import r2_score
@@ -728,6 +729,218 @@ adni2oasis_results = pd.concat(adni2oasis_results, keys=["clin", "struct", "clin
 
 across_results = pd.concat([oasis2adni_results, adni2oasis_results], axis=0, 
                            keys=["OASIS_to_ADNI", "ADNI_to_OASIS"], names=["dataset", "modality", "target"])
+
+# %%
+# ### 3.3 Cross-Dataset Training Size Sensitivity Analysis
+
+def predict_across_datasets_with_train_size(X_train, y_train, X_test, y_test, root_dir, train_size, n_splits=1000):
+    if train_size > len(X_train):
+        raise ValueError(f"train_size={train_size} exceeds the available training sample ({len(X_train)}).")
+
+    ss = ShuffleSplit(n_splits=n_splits, train_size=train_size, random_state=0)
+
+    for iter, (train_idx, _) in tqdm(enumerate(ss.split(X_train, y_train)), total=n_splits):
+        path = Path(f"{root_dir}/iteration_{iter+1}")
+        path.mkdir(parents=True, exist_ok=True)
+
+        if (path / "pipeline.joblib").exists() and (path / "predictions.csv").exists():
+            continue
+
+        X_train_iter = X_train.iloc[train_idx]
+        y_train_iter = y_train.iloc[train_idx]
+
+        X = pd.concat([X_train_iter, X_test])
+        y = pd.concat([y_train_iter, y_test])
+        train_idx_full = np.arange(len(X_train_iter))
+        test_idx_full = np.arange(len(X_train_iter), len(X))
+
+        fit_pipeline(X, y, train_idx_full, test_idx_full, path)
+
+
+def fit_split_multioutput_pipeline(X_train, y_train, X_test, y_test, root_dir):
+    root_dir = Path(root_dir)
+    root_dir.mkdir(parents=True, exist_ok=True)
+
+    if (root_dir / "pipeline.joblib").exists() and (root_dir / "predictions.csv").exists():
+        return
+
+    y_train = pd.DataFrame(y_train)
+    y_test = pd.DataFrame(y_test)
+
+    imputer, _, _ = get_iterative_imputer(X_train, X_test, random_state=0)
+    X_train_imputed = imputer.fit_transform(X_train)
+    X_test_imputed = imputer.transform(X_test)
+
+    estimator = MultiOutputRegressor(RandomForestRegressor(random_state=0, n_estimators=50))
+    estimator.fit(X_train_imputed, y_train)
+
+    y_pred = pd.DataFrame(estimator.predict(X_test_imputed)).rename(columns={0: 'mmse_pred', 1: 'sob_pred'})
+    y_pred.index = y_test.index.values
+
+    df = pd.concat([y_pred, y_test], axis=1)
+
+    metrics = {
+        'r2': r2_score,
+        'mae': mean_absolute_error,
+        'mse': mean_squared_error,
+    }
+    results_df = pd.DataFrame({
+        var: {name: func(df[f'{var}_slope'], df[f'{var}_pred']) for name, func in metrics.items()}
+        for var in ['sob', 'mmse']
+    }).T
+
+    save_pipeline_and_df({"imputer": imputer, "estimator": estimator}, df, results_df, root_dir)
+
+
+def predict_across_datasets_split_multioutput(X_train, y_train, X_test, y_test, root_dir):
+    fit_split_multioutput_pipeline(X_train, y_train, X_test, y_test, root_dir)
+
+
+def predict_across_datasets_with_train_size_split_multioutput(X_train, y_train, X_test, y_test, root_dir, train_size, n_splits=1000):
+    if train_size > len(X_train):
+        raise ValueError(f"train_size={train_size} exceeds the available training sample ({len(X_train)}).")
+
+    ss = ShuffleSplit(n_splits=n_splits, train_size=train_size, random_state=0)
+
+    for iter, (train_idx, _) in tqdm(enumerate(ss.split(X_train, y_train)), total=n_splits):
+        path = Path(f"{root_dir}/iteration_{iter+1}")
+        path.mkdir(parents=True, exist_ok=True)
+
+        if (path / "pipeline.joblib").exists() and (path / "predictions.csv").exists():
+            continue
+
+        fit_split_multioutput_pipeline(X_train.iloc[train_idx], y_train.iloc[train_idx], X_test, y_test, path)
+
+between_train_sizes = [60, 100, 200, 300, 600]
+across_train_size_combinations = [
+    (oasis_y, oasis_X_clin_fs_filtered, adni_y, adni_X_clin_fs_filtered, "OASIS_to_ADNI_clin_struct_train_size_new"),
+    (adni_y, adni_X_clin_fs_filtered, oasis_y, oasis_X_clin_fs_filtered, "ADNI_to_OASIS_clin_struct_train_size_new"),
+]
+across_train_size_split_multioutput_combinations = [
+    (oasis_y, oasis_X_clin_fs_filtered, adni_y, adni_X_clin_fs_filtered, "OASIS_to_ADNI_clin_struct_train_size_split_multioutput_new"),
+    (adni_y, adni_X_clin_fs_filtered, oasis_y, oasis_X_clin_fs_filtered, "ADNI_to_OASIS_clin_struct_train_size_split_multioutput_new"),
+]
+
+for y_train, X_train, y_test, X_test, root_dir in across_train_size_combinations:
+    for train_size in between_train_sizes:
+        sized_root_dir = f"{root_dir}_{train_size}"
+        print(f"Processing {sized_root_dir}...")
+        predict_across_datasets_with_train_size(X_train, y_train, X_test, y_test, sized_root_dir, train_size=train_size, n_splits=10)
+
+for y_train, X_train, y_test, X_test, root_dir in across_train_size_split_multioutput_combinations:
+    for train_size in between_train_sizes:
+        sized_root_dir = f"{root_dir}_{train_size}"
+        print(f"Processing {sized_root_dir}...")
+        predict_across_datasets_with_train_size_split_multioutput(X_train, y_train, X_test, y_test, sized_root_dir, train_size=train_size, n_splits=10)
+
+
+def get_across_train_size_results(root_stub, train_sizes=between_train_sizes, iters=range(10)):
+    results = [get_results(f"{root_stub}_{train_size}", iters) for train_size in train_sizes]
+    return pd.concat(results, keys=train_sizes, names=["train_size", "iteration", "target"])
+
+
+def get_across_train_size_model_results(native_root_stub, split_root_stub, train_sizes=between_train_sizes, iters=range(10)):
+    native_results = get_across_train_size_results(native_root_stub, train_sizes, iters)
+    split_results = get_across_train_size_results(split_root_stub, train_sizes, iters)
+    return pd.concat(
+        [native_results, split_results],
+        keys=["native multioutput", "split multioutput"],
+        names=["model", "train_size", "iteration", "target"]
+    )
+
+
+oasis2adni_train_size_results = get_across_train_size_model_results(
+    "OASIS_to_ADNI_clin_struct_train_size_new",
+    "OASIS_to_ADNI_clin_struct_train_size_split_multioutput_new"
+)
+adni2oasis_train_size_results = get_across_train_size_model_results(
+    "ADNI_to_OASIS_clin_struct_train_size_new",
+    "ADNI_to_OASIS_clin_struct_train_size_split_multioutput_new"
+)
+
+across_train_size_results = pd.concat(
+    [oasis2adni_train_size_results, adni2oasis_train_size_results],
+    keys=["OASIS_to_ADNI", "ADNI_to_OASIS"],
+    names=["dataset", "model", "train_size", "iteration", "target"]
+)
+across_train_size_results.to_csv("results_between_train_sizes.csv")
+
+
+def get_train_size_rsq_plot(data, y, x, hue, colors, title="", xlabel="R^2", ax=None, ref_val=None, full_sample_points=None, digits=2, full_sample_label="full sample"):
+    if ax is None:
+        ax = plt.gca()
+
+    categories = data[y].drop_duplicates().tolist()
+    hue_order = data[hue].drop_duplicates().tolist()
+    palette = dict(zip(hue_order, colors))
+    offsets = np.linspace(-0.2, 0.2, len(hue_order)) if len(hue_order) > 1 else np.array([0.0])
+
+    ax.axvline(0, color='black', linestyle='--', linewidth=1.2)
+    if ref_val is not None:
+        ax.axvline(ref_val, color='black', linestyle='-', linewidth=1.2)
+    [ax.axvline(p, color='gray', linestyle='--', linewidth=0.3) for p in np.arange(-0.6, 0.8, 0.2)]
+
+    sns.boxplot(data=data, y=y, x=x, hue=hue, palette=palette, dodge=True, ax=ax, showfliers=False, linewidth=0.5, order=categories, hue_order=hue_order)
+
+    medians = data.groupby([y, hue], sort=False)[x].median()
+    for i, category in enumerate(categories):
+        for offset, model in zip(offsets, hue_order):
+            key = (category, model)
+            if key in medians.index:
+                median = medians.loc[key]
+                ax.text(median, i + offset, f"{median:.{digits}f}", ha='center', va='center', fontdict={'fontsize': 11, 'fontweight':'bold', 'fontname': 'Arial'})
+
+    if full_sample_points is not None:
+        full_sample_pos = len(categories)
+        for offset, model in zip(offsets, hue_order):
+            if model in full_sample_points:
+                point_val = full_sample_points[model]
+                ax.scatter(point_val, full_sample_pos + offset, color=palette[model], s=35, zorder=5)
+                ax.text(point_val, full_sample_pos + offset, f"{point_val:.{digits}f}", ha='left', va='center', fontdict={'fontsize': 11, 'fontweight':'bold', 'fontname': 'Arial'})
+        ax.set_yticks(range(len(categories) + 1), labels=categories + [full_sample_label])
+        ax.set_ylim(len(categories) + 0.5, -0.5)
+
+    ax.tick_params(axis='both', labelfontfamily='Arial', labelsize=12)
+    ax.set_xlabel(xlabel, fontdict={'fontsize': 12, 'fontstyle':'italic', 'fontweight':'bold', 'fontname': 'Arial'})
+    ax.set_ylabel('')
+    ax.set_title(title, fontdict={'fontsize': 16, 'fontweight':'bold', 'fontname': 'Arial'})
+    ax.legend(title='')
+
+
+across_train_size_results_plot = across_train_size_results.reset_index()
+across_train_size_results_plot["train_size"] = across_train_size_results_plot["train_size"].map(lambda train_size: f"n = {train_size}")
+
+fig, axs = plt.subplots(2, 2, figsize=(10, 6), sharex=True, sharey=False, gridspec_kw={'hspace': 0.45, 'wspace': 0.4})
+plot_specs = [
+    ("OASIS_to_ADNI", "sob", "OASIS-3 → ADNI: CDR-SOB", axs[0, 0]),
+    ("OASIS_to_ADNI", "mmse", "OASIS-3 → ADNI: MMSE", axs[0, 1]),
+    ("ADNI_to_OASIS", "sob", "ADNI → OASIS-3: CDR-SOB", axs[1, 0]),
+    ("ADNI_to_OASIS", "mmse", "ADNI → OASIS-3: MMSE", axs[1, 1]),
+]
+
+for dataset, target, title, ax in plot_specs:
+    plot_df = across_train_size_results_plot.query("dataset == @dataset and target == @target")
+    full_sample_points = {
+        "native multioutput": pd.read_csv(f"{dataset}_clin_struct/results.csv", index_col=0).loc[target, "r2"],
+        "split multioutput": pd.read_csv(f"{dataset}_clin_struct_split_multioutput/results.csv", index_col=0).loc[target, "r2"],
+    }
+    ref_val = full_sample_points["native multioutput"]
+    get_train_size_rsq_plot(plot_df, "train_size", "r2", "model", ["#E89D9D", "#7DB7E8"], title, "R\u00B2", ax=ax, ref_val=ref_val, full_sample_points=full_sample_points)
+
+# remove legend from all and add a single legend for the entire figure
+handles, labels = axs[0, 0].get_legend_handles_labels()
+fig.legend(handles, labels, title='Model', loc='upper center', ncol=2, fontsize=12, title_fontsize=12, frameon=False)
+# add some margin to the top of the figure to accommodate the legend
+fig.subplots_adjust(top=0.85)
+
+# edit all axes to have same xlim
+for ax in axs.flatten():
+    ax.set_xlim(-0.05, 0.55)
+    ax.get_legend().remove()
+
+
+plt.tight_layout()
+# plt.savefig("r2_perf_between_train_sizes.pdf", dpi=300)
 
 # %%
 # ## 4. Statistical Model Comparisons
